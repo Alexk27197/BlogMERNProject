@@ -1,11 +1,13 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 const connectToDB = require("./connectToDB");
 dotenv.config();
 connectToDB();
 const app = express();
 
+app.use(cookieParser());
 app.use(express.json());
 app.use(cors());
 

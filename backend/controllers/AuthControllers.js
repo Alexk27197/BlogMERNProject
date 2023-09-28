@@ -39,8 +39,7 @@ const registerController = async (req, res) => {
 };
 
 const loginController = async (req, res) => {
-  const { email, password } = req.body;
-
+  const { email } = req.body;
   try {
     const user = await UserModel.findOne({ email });
 
@@ -51,7 +50,7 @@ const loginController = async (req, res) => {
       });
     }
 
-    const camparePass = await bcrypt.compare(password, user.password);
+    const camparePass = await bcrypt.compare(req.body.password, user.password);
 
     if (!camparePass) {
       errors.push("Invalid Password");
@@ -61,17 +60,28 @@ const loginController = async (req, res) => {
       });
     }
 
-    const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
+    const token = jwt.sign(
+      {
+        _id: user._id,
+        username: user.name,
+        email: user.email,
+        isAdmin: user.isAdmin,
+        userAvatar: user.userAvatar,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
 
     res.cookie("token", token, {
       expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       httpOnly: true,
+      sameSite: "none",
       // secure: true,
     });
 
-    res.status(200).json({ message: "Login Successfuly" });
+    res.status(200).json({ message: "Login Successfuly", userId: user._id });
   } catch (error) {
     res.status(500).send({
       success: false,
@@ -80,4 +90,55 @@ const loginController = async (req, res) => {
   }
 };
 
-module.exports = { registerController, loginController };
+const getUserController = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const user = await UserModel.findById({ id });
+    const { password, ...userInfo } = user._doc;
+
+    res.status(200).json({ message: "Getting user successfuly", userInfo });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: "Get User Failed!",
+    });
+  }
+};
+
+const updatePasswordController = async (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+
+  if (!newPassword || newPassword.trim() === "") {
+    return res.status(400).json({
+      success: false,
+      message: "New password is required",
+    });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await UserModel.findByIdAndUpdate(id, {
+      password: hashedPassword,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: "Failed to update password",
+    });
+  }
+};
+
+module.exports = {
+  registerController,
+  loginController,
+  getUserController,
+  updatePasswordController,
+};
