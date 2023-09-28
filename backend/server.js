@@ -4,10 +4,12 @@ const cors = require("cors");
 const connectToDB = require("./connectToDB");
 dotenv.config();
 connectToDB();
+const app = express();
 
 app.use(express.json());
 app.use(cors());
-const app = express();
+
+app.use("/api/auth", require("./routes/AuthRoutes"));
 
 const PORT = process.env.PORT || 4000;
 
