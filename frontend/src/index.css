@@ -6,6 +6,6 @@
 
 @layer components {
   .profile-menu {
-    @apply w-32 h-32 bg-teal-400 absolute top-[61px] left-1/2 transform -translate-x-1/2 transition-transform duration-500 ease-in-out;
+    @apply min-w-min min-h-min p-3 bg-amber-400 absolute top-[52px] right-0 transition-transform duration-500 ease-in-out;
   }
 }
