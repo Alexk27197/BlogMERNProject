@@ -2,7 +2,9 @@ const jwt = require("jsonwebtoken");
 const UserModel = require("../models/UserModel");
 const verify = async (req, res, next) => {
   try {
-    const token = req.cookies.token;
+    let token;
+    token = req.cookies.jwt;
+    console.log(token);
 
     if (!token) {
       return res
@@ -11,7 +13,7 @@ const verify = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    req.user = await UserModel.findById(decoded.userId).select("-password");
 
     next();
   } catch (error) {

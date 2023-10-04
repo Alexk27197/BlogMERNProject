@@ -1,8 +1,12 @@
 const UserModel = require("../models/UserModel");
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
+const generateToken = require("../generateToken");
+const cloudinary = require("cloudinary").v2;
+//@desc Register a new user
+//route POST /api/auth/register
+//@access Public
 
-const registerController = async (req, res) => {
+const register = async (req, res) => {
   const { name, email, password, isAdmin } = req.body;
   const userAvatar = req.file ? req.file.path : null;
   let errors = {};
@@ -16,7 +20,7 @@ const registerController = async (req, res) => {
     if (!password || password.trim() === "" || password.length < 6) {
       errors.passwordError = "Password Is Required";
     }
-    if (errors) {
+    if (errors.emailError || errors.nameError || errors.passwordError) {
       return res.status(400).json({ errors });
     }
     const userExist = await UserModel.findOne({ email });
@@ -52,50 +56,52 @@ const registerController = async (req, res) => {
   }
 };
 
-const loginController = async (req, res) => {
+//@desc Login user/set token
+//route POST /api/auth/login
+//@access Public
+const login = async (req, res) => {
   const { email } = req.body;
+
+  let errors = {};
   try {
+    if (!email || email.trim() === "") {
+      errors.emailError = "Email Is Required";
+    }
+    if (
+      !req.body.password ||
+      req.body.password.trim() === "" ||
+      req.body.password.length < 6
+    ) {
+      errors.passwordError = "Password Is Required";
+    }
+
     const user = await UserModel.findOne({ email });
 
     if (!user) {
-      return res.status(200).send({
-        success: false,
-        message: "Email is not registered",
-      });
+      errors.wrongEmail = "Password or Email not correct";
     }
 
     const camparePass = await bcrypt.compare(req.body.password, user.password);
 
     if (!camparePass) {
-      errors.push("Invalid Password");
-      return res.status(200).send({
-        success: false,
-        message: "Invalid login credentials",
-      });
+      errors.wrongPassword = "Password or Email not correct";
     }
 
-    const token = jwt.sign(
-      {
-        _id: user._id,
-        username: user.name,
-        email: user.email,
-        isAdmin: user.isAdmin,
-        userAvatar: user.userAvatar,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "7d",
-      }
-    );
+    if (
+      errors.emailError ||
+      errors.wrongEmail ||
+      errors.passwordError ||
+      errors.wrongPassword
+    ) {
+      return res.status(400).json({ errors });
+    }
 
-    res.cookie("token", token, {
-      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      httpOnly: true,
-      sameSite: "none",
-      // secure: true,
-    });
+    const { password, ...userInfo } = user._doc;
+    generateToken(res, user._id);
 
-    res.status(200).json({ message: "Login Successfuly", userId: user._id });
+    res
+      .status(200)
+      .json({ message: "Login Successfuly", success: true, userInfo });
   } catch (error) {
     res.status(500).send({
       success: false,
@@ -104,55 +110,96 @@ const loginController = async (req, res) => {
   }
 };
 
-const getUserController = async (req, res) => {
-  const { id } = req.params;
+const updateUserProfile = async (req, res) => {
+  const { name, email, password } = req.body;
 
   try {
-    const user = await UserModel.findById({ id });
-    const { password, ...userInfo } = user._doc;
+    const user = await UserModel.findById(req.user._id);
+    if (!user) {
+      return res.status(404).send({
+        success: false,
+        message: "User not found",
+      });
+    }
 
-    res.status(200).json({ message: "Getting user successfuly", userInfo });
+    if (req.file) {
+      const cloudinaryURL = user.userAvatar;
+      const parts = cloudinaryURL.split("/");
+      const filename = parts[parts.length - 1];
+      const publicIdWithVersion =
+        parts[parts.length - 2] + "/" + filename.split(".")[0];
+      const publicId = publicIdWithVersion.replace(/^v\d+\//, "");
+
+      await cloudinary.uploader.destroy(publicId);
+
+      user.userAvatar = req.file.path;
+    }
+
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      user.password = hashedPassword;
+    }
+    user.name = name;
+    user.email = email;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+    });
   } catch (error) {
     res.status(500).send({
       success: false,
-      message: "Get User Failed!",
+      message: "Failed to update profile",
     });
   }
 };
 
-const updatePasswordController = async (req, res) => {
-  const { id } = req.params;
-  const { newPassword } = req.body;
-
-  if (!newPassword || newPassword.trim() === "") {
-    return res.status(400).json({
-      success: false,
-      message: "New password is required",
-    });
-  }
-
+//@desc Logout logged out user
+//route POST /api/auth/logout-user
+//@access Public
+const getUserProfile = async (req, res) => {
   try {
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    await UserModel.findByIdAndUpdate(id, {
-      password: hashedPassword,
-    });
-
+    const userInfo = req.user;
     res.status(200).json({
+      message: "Getting user details successfuly!",
       success: true,
-      message: "Password updated successfully",
+      userInfo,
     });
   } catch (error) {
     res.status(500).send({
       success: false,
-      message: "Failed to update password",
+      message: "Getting user info Failed!",
+    });
+  }
+};
+
+//@desc Logout logged out user
+//route POST /api/auth/logout-user
+//@access Public
+const logout = async (req, res) => {
+  try {
+    res.cookie("token", {
+      httpOnly: true,
+      expires: new Date(0),
+    });
+
+    res
+      .status(200)
+      .json({ message: "User logged out successfuly!", success: true });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: "User logged out Failed!",
     });
   }
 };
 
 module.exports = {
-  registerController,
-  loginController,
-  getUserController,
-  updatePasswordController,
+  register,
+  login,
+  getUserProfile,
+  updateUserProfile,
+  logout,
 };

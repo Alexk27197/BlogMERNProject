@@ -1,9 +1,14 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, NavLink } from "react-router-dom";
 import { Headerlinks } from "../constant/index";
 import { ChevronDownIcon } from "@heroicons/react/solid";
 import { AiOutlineMenu, AiOutlineClose } from "react-icons/ai";
 import userDefault from "../assets/user.png";
+import { useDispatch, useSelector } from "react-redux";
+
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 const Header = () => {
   const [openProfileMenu, setOpenProfileMenu] = useState(false);
   const [openMenu, setOpenMenu] = useState(false);
@@ -14,6 +19,7 @@ const Header = () => {
     setOpenMenu(!openMenu);
   };
   const user = false;
+
   return (
     <header className="bg-slate-500 py-3">
       <nav className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 flex flex-wrap items-center justify-between text-white">
@@ -31,9 +37,14 @@ const Header = () => {
           {Headerlinks.map((link) => (
             <li
               key={link.name}
-              className="hover:text-teal-400 transition-colors duration-300 cursor-pointer"
+              className="hover:text-teal-400 text-white transition-colors duration-300 cursor-pointer"
             >
-              <Link to={link.to}>{link.name}</Link>
+              <NavLink
+                to={link.to}
+                className={({ isActive }) => (isActive ? "text-teal-400" : "")}
+              >
+                {link.name}
+              </NavLink>
             </li>
           ))}
         </ul>
@@ -46,11 +57,7 @@ const Header = () => {
             <div className="flex justify-center items-center gap-4">
               <div className="relative flex justify-center items-center cursor-pointer">
                 <img
-                  src={
-                    user
-                      ? "https://randomuser.me/api/portraits/men/5.jpg"
-                      : userDefault
-                  }
+                  src={user ? user.userAvatar || userDefault : userDefault}
                   alt="profile"
                   width={30}
                   height={30}
@@ -74,7 +81,7 @@ const Header = () => {
               </div>
 
               <div className="text-md sm:text-lg md:text-xl">
-                {user ? "Admin" : "Guest"}
+                {user ? `${user.name}` : "Guest"}
               </div>
             </div>
 
@@ -85,11 +92,29 @@ const Header = () => {
                   : "profile-menu scale-0"
               }
             >
-              <div className="flex justify-center items-center gap-2 ">
-                <Link to={"/register"}>Register</Link>
-                {" | "}
-                <Link to={"/login"}>Login</Link>
-              </div>
+              {user ? (
+                <div className="flex justify-center items-center gap-2 ">
+                  <div className="hover:text-teal-400 transition-colors duration-300 cursor-pointer">
+                    Logout
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-center items-center gap-2 ">
+                  <Link
+                    className="hover:text-teal-400 transition-colors duration-300"
+                    to={"/register"}
+                  >
+                    Register
+                  </Link>
+                  {" | "}
+                  <Link
+                    className="hover:text-teal-400 transition-colors duration-300"
+                    to={"/login"}
+                  >
+                    Login
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
 
@@ -106,7 +131,11 @@ const Header = () => {
         >
           <div
             onClick={() => setOpenMenu(false)}
-            className={openMenu ? "absolute left-1 top-1 z-[999px]" : "hidden"}
+            className={
+              openMenu
+                ? "cursor-pointer absolute left-1 top-1 z-[999px]"
+                : "hidden"
+            }
           >
             <AiOutlineClose size={28} />
           </div>
@@ -117,7 +146,14 @@ const Header = () => {
                 key={link.name}
                 className="hover:text-teal-400 transition-colors duration-300 cursor-pointer"
               >
-                <Link to={link.to}>{link.name}</Link>
+                <NavLink
+                  className={({ isActive }) =>
+                    isActive ? "text-teal-400" : ""
+                  }
+                  to={link.to}
+                >
+                  {link.name}
+                </NavLink>
               </li>
             ))}
           </ul>
